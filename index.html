@@ -1,0 +1,66 @@
+<HTML>
+<head>
+    <script>
+        window.onload = function() {
+            let canvas = document.getElementById("mycanvas");
+            let video = document.getElementById("myvideo");
+            let context = canvas.getContext("2d");
+
+            // Restrict the volume
+            video.volume = 0.25;
+
+            video.addEventListener("play", () => {
+                video.requestVideoFrameCallback(sobelEdge);
+            });
+
+            let width = canvas.width;
+            let height = canvas.height;
+        
+            let gray = new Float32Array(width * height);
+
+            function sobelEdge(now, metadata) {  
+                if (video.paused || video.ended) return;
+
+                context.drawImage(video, 0, 0, width, height);
+                
+                // get ImageData object from the source frame
+                let imageData = context.getImageData(0, 0,width, height);
+                let data = imageData.data;
+
+                // Convert to grayscale using pre-allocated array, avoid re-creating buffer
+                for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+                    gray[j] = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                    data[i+1] = data[i+2] = 0;
+                }
+
+                // Sobel edge detection
+                for (let y = 1; y < height - 1; y++) {
+                    for (let x = 1; x < width - 1; x++) {
+                        let pos = y * width + x;
+
+                        let sumX =
+                            - (gray[pos - width - 1] + gray[pos + width - 1]) - 2 * gray[pos - 1]
+                            + (gray[pos - width + 1] + gray[pos + width + 1]) + 2 * gray[pos + 1];
+
+                        let sumY =
+                            - (gray[pos - width - 1] + gray[pos - width + 1]) - 2 * gray[pos - width]
+                            + (gray[pos + width - 1] + gray[pos + width + 1]) + 2 * gray[pos + width];
+
+                            let magnitude = Math.sqrt(sumX * sumX + sumY * sumY);
+                            let real_pos = pos * 4;
+
+                        data[real_pos] = data[real_pos + 1] = data[real_pos + 2] = magnitude > 255 ? 255 : magnitude;
+                    }
+                }
+
+                context.putImageData(imageData, 0, 0);
+                requestAnimationFrame(sobelEdge);
+            }
+        };
+    </script>
+</head>
+<body>
+    <video id="myvideo" src="video.mp4" width="800px" height="540px" controls  style="object-fit: fill" ></video>
+    <canvas id="mycanvas" width="800px" height="540px" style="object-fit: fill"></canvas>
+</body>
+</HTML>
